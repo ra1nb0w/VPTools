@@ -134,13 +134,17 @@ void DavisRFM69::initialize(byte freqBand)
   initStations();
   lastDiscStep = micros();
 
+#ifndef RFM69_TX_ONLY
   MsTimer2::set(1, DavisRFM69::handleTimerInt);
   MsTimer2::start();
+#endif
 }
 
 void DavisRFM69::stopReceiver() {
   Timer1.detachInterrupt();
+#ifndef RFM69_TX_ONLY
   MsTimer2::stop();
+#endif
   setMode(RF69_MODE_SLEEP);
 }
 
@@ -366,14 +370,18 @@ void DavisRFM69::setTxMode(bool mode)
 // IMPORTANT: make sure buffer is at least 10 bytes
 void DavisRFM69::send(const byte* buffer, byte channel)
 {
+#ifndef RFM69_TX_ONLY
   MsTimer2::stop();
+#endif
   setTxMode(true);
   writeReg(REG_PACKETCONFIG2, (readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
   setChannel(channel);
   sendFrame(buffer);
   setTxMode(false);
   setChannel(stations[curStation].channel);
+#ifndef RFM69_TX_ONLY
   MsTimer2::start();
+#endif
 }
 
 // IMPORTANT: make sure buffer is at least 6 bytes
