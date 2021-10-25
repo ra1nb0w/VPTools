@@ -132,7 +132,8 @@ class DavisRFM69 {
     void setCS(byte newSPISlaveSelect);
     int readRSSI(bool forceTrigger = false);
     void setHighPower(bool onOFF = true); // have to call it after initialize for RFM69HW
-    void setPowerLevel(byte level); // reduce/increase transmit power level
+    void setPowerLevel(byte powerLevel); // reduce/increase transmit power level
+    uint8_t getPowerLevel();
     void sleep();
     byte readTemperature(byte calFactor=0); // get CMOS temperature (8bit)
     void rcCalibration(); // calibrate the internal RC oscillator for use in wide temperature variations - see datasheet section [4.3.5. RC Timer Accuracy]

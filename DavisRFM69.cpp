@@ -611,6 +611,51 @@ void DavisRFM69::setHighPowerRegs(bool onOff) {
   writeReg(REG_TESTPA2, onOff ? 0x7C : 0x70);
 }
 
+// Control transmitter output power (this is NOT a dBm value!)
+// the power configurations are explained in the SX1231H datasheet (Table 10 on p21; RegPaLevel p66): http://www.semtech.com/images/datasheet/sx1231h.pdf
+// valid powerLevel parameter values are 0-31 and result in a directly proportional effect on the output/transmission power
+// this function implements 2 modes as follows:
+//   - for RFM69 W/CW the range is from 0-31 [-18dBm to 13dBm] (PA0 only on RFIO pin)
+//   - for RFM69 HW/HCW the range is from 0-22 [-2dBm to 20dBm]  (PA1 & PA2 on PA_BOOST pin & high Power PA settings - see section 3.3.7 in datasheet, p22)
+//   - the HW/HCW 0-24 range is split into 3 REG_PALEVEL parts:
+//     -  0-15 = REG_PALEVEL 16-31, ie [-2 to 13dBm] & PA1 only
+//     - 16-19 = REG_PALEVEL 26-29, ie [12 to 15dBm] & PA1+PA2
+//     - 20-23 = REG_PALEVEL 28-31, ie [17 to 20dBm] & PA1+PA2+HiPower (HiPower is only enabled before going in TX mode, ie by setMode(RF69_MODE_TX)
+// The HW/HCW range overlaps are to smooth out transitions between the 3 PA domains, based on actual current/RSSI measurements
+// Any changes to this function also demand changes in dependent function setPowerDBm()
+void DavisRFM69::setPowerLevel(byte powerLevel) {
+  uint8_t PA_SETTING;
+  if (_isRFM69HW) {
+    if (powerLevel>23) powerLevel = 23;
+    _powerLevel =  powerLevel;
+
+    //now set Pout value & active PAs based on _powerLevel range as outlined in summary above
+    if (_powerLevel < 16) {
+      powerLevel += 16;
+      PA_SETTING = RF_PALEVEL_PA1_ON; // enable PA1 only
+    } else {
+      if (_powerLevel < 20)
+        powerLevel += 10;
+      else
+        powerLevel += 8;
+      PA_SETTING = RF_PALEVEL_PA1_ON | RF_PALEVEL_PA2_ON; // enable PA1+PA2
+    }
+    setHighPowerRegs(true); //always call this in case we're crossing power boundaries in TX mode
+  } else { //this is a W/CW, register value is the same as _powerLevel
+    if (powerLevel>31) powerLevel = 31;
+    _powerLevel =  powerLevel;
+    PA_SETTING = RF_PALEVEL_PA0_ON; // enable PA0 only
+  }
+
+  //write value to REG_PALEVEL
+  writeReg(REG_PALEVEL, PA_SETTING | powerLevel);
+}
+
+// return stored _powerLevel
+uint8_t DavisRFM69::getPowerLevel() {
+  return _powerLevel;
+}
+
 void DavisRFM69::setCS(byte newSPISlaveSelect) {
   _slaveSelectPin = newSPISlaveSelect;
   pinMode(_slaveSelectPin, OUTPUT);
